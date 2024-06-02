@@ -2,8 +2,8 @@
 #define I2C_MANAGER_H
 
 #include "driver/i2c.h"
-#include "golioth_client.h" // Include the specific Golioth header
-#include "golioth_log.h"    // Include Golioth logging header
+#include "client.h" // Include the specific Golioth header
+#include "log.h"    // Include Golioth logging header
 // #include "sd_card.h"        // Include SD card header
 
 #define I2C_MASTER_SDA_IO 21           // Sets the GPIO number for the serial data bus (SDA)
