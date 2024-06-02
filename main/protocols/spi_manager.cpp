@@ -26,7 +26,7 @@ spi_device_handle_t spi_device7;
 // Device connection status
 bool spi_device_connected[7] = {false, false, false, false, false, false, false};
 
-void init_spi_bus(spi_host_device_t host, int dma_channel) {
+void spi_init_bus(spi_host_device_t host, int dma_channel) {
     spi_bus_config_t buscfg = {
         .mosi_io_num = GPIO_NUM_23,
         .miso_io_num = GPIO_NUM_19,
@@ -38,7 +38,7 @@ void init_spi_bus(spi_host_device_t host, int dma_channel) {
     ESP_ERROR_CHECK(spi_bus_initialize(host, &buscfg, dma_channel));
 }
 
-void init_spi_device(spi_host_device_t host, int cs_pin, spi_device_handle_t* spi_handle) {
+void spi_init_device(spi_host_device_t host, int cs_pin, spi_device_handle_t* spi_handle) {
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 1*1000*1000,  // Clock out at 1 MHz
         .mode = 0,                      // SPI mode 0
@@ -50,21 +50,21 @@ void init_spi_device(spi_host_device_t host, int cs_pin, spi_device_handle_t* sp
     ESP_ERROR_CHECK(spi_bus_add_device(host, &devcfg, spi_handle));
 }
 
-void setup_spi() {
+void spi_setup() {
     // Initialize SPI2 and SPI3 buses
-    init_spi_bus(SPI2_HOST, 1);
-    init_spi_bus(SPI3_HOST, 2);
+    spi_init_bus(SPI2_HOST, 1);
+    spi_init_bus(SPI3_HOST, 2);
 
     // Initialize devices on SPI2
-    init_spi_device(SPI2_HOST, CS_PIN1, &spi_device1);
-    init_spi_device(SPI2_HOST, CS_PIN2, &spi_device2);
-    init_spi_device(SPI2_HOST, CS_PIN3, &spi_device3);
-    init_spi_device(SPI2_HOST, CS_PIN4, &spi_device4);
-    init_spi_device(SPI2_HOST, CS_PIN5, &spi_device5);
-    init_spi_device(SPI2_HOST, CS_PIN6, &spi_device6);
+    spi_init_device(SPI2_HOST, CS_PIN1, &spi_device1);
+    spi_init_device(SPI2_HOST, CS_PIN2, &spi_device2);
+    spi_init_device(SPI2_HOST, CS_PIN3, &spi_device3);
+    spi_init_device(SPI2_HOST, CS_PIN4, &spi_device4);
+    spi_init_device(SPI2_HOST, CS_PIN5, &spi_device5);
+    spi_init_device(SPI2_HOST, CS_PIN6, &spi_device6);
 
     // Initialize device on SPI3
-    init_spi_device(SPI3_HOST, CS_PIN7, &spi_device7);
+    spi_init_device(SPI3_HOST, CS_PIN7, &spi_device7);
     // two more devices can be added to the SPI3 bus
 
     ESP_LOGI(TAG, "SPI devices initialized");
@@ -121,7 +121,7 @@ void IRAM_ATTR gpio_isr_handler(void* arg) {
     }
 }
 
-void gpio_init() {
+void spi_gpio_config() {
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_ANYEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
@@ -142,7 +142,7 @@ void gpio_init() {
     gpio_isr_handler_add(CS_PIN7, gpio_isr_handler, (void*) CS_PIN7);
 }
 
-void spi_periodic_check_task(void* pvParameters) {
+void spi_periodic_check_device(void* pvParameters) {
     uint8_t handshake_cmd = 0xAA;  // Example handshake command
     uint8_t response[1];
 

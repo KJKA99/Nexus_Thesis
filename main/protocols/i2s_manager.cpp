@@ -4,24 +4,24 @@
 #include "sdkconfig.h"
 #include "Golioth.h" // Hypothetical header for Golioth client
 
-#define I2S_WS_PIN 13
-#define I2S_BCLK_PIN 14
+/*#define I2S_WS_PIN 13
+  #define I2S_BCLK_PIN 14
 
 #define I2S_BUS_0 I2S_NUM_0
-#define I2S_BUS_1 I2S_NUM_1
+#define I2S_BUS_1 I2S_NUM_1*/
 
 static const char *TAG = "I2S_Manager";
 
 // Function prototypes
-void init_i2s_bus(i2s_port_t i2s_num, int sd_pin, bool is_tx);
-void activate_i2s_device(i2s_port_t i2s_num, bool activate);
-void scan_i2s_bus();
-void read_i2s_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_read);
-void write_i2s_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_written);
+void i2s_init(i2s_port_t i2s_num, int sd_pin, bool is_tx);
+void i2s_activate_device(i2s_port_t i2s_num, bool activate);
+void i2s_scan_bus();
+void i2s_read_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_read);
+void i2s_write_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_written);
 void handle_golioth_client(Golioth& client);
 
 // I2S initialization
-void init_i2s_bus(i2s_port_t i2s_num, int sd_pin, bool is_tx) {
+void i2s_init(i2s_port_t i2s_num, int sd_pin, bool is_tx) {
     i2s_config_t i2s_config = {
         .mode = I2S_MODE_MASTER | (is_tx ? I2S_MODE_TX : I2S_MODE_RX),
         .sample_rate = 44100,
@@ -49,7 +49,7 @@ void init_i2s_bus(i2s_port_t i2s_num, int sd_pin, bool is_tx) {
 }
 
 // Activate or deactivate I2S device
-void activate_i2s_device(i2s_port_t i2s_num, bool activate) {
+void i2s_activate_device(i2s_port_t i2s_num, bool activate) {
     if (activate) {
         ESP_ERROR_CHECK(i2s_start(i2s_num));
     } else {
@@ -58,13 +58,13 @@ void activate_i2s_device(i2s_port_t i2s_num, bool activate) {
 }
 
 // Scan I2S bus (generic, optional)
-void scan_i2s_bus() {
+void i2s_scan_bus() {
     ESP_LOGI(TAG, "Scanning I2S bus...");
     // Implement any checks needed to verify device functionality
 }
 
 // Read data from I2S device
-void read_i2s_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_read) {
+void i2s_read_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_read) {
     esp_err_t ret = i2s_read(i2s_num, buffer, buffer_size, bytes_read, portMAX_DELAY);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "I2S read error: %s", esp_err_to_name(ret));
@@ -72,7 +72,7 @@ void read_i2s_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t*
 }
 
 // Write data to I2S device
-void write_i2s_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_written) {
+void i2s_write_data(i2s_port_t i2s_num, char* buffer, size_t buffer_size, size_t* bytes_written) {
     esp_err_t ret = i2s_write(i2s_num, buffer, buffer_size, bytes_written, portMAX_DELAY);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "I2S write error: %s", esp_err_to_name(ret));
@@ -87,11 +87,11 @@ void handle_golioth_client(Golioth& client) {
 // Main application loop
 void app_main() {
     // Example initialization of two I2S buses with different SD pins
-    init_i2s_bus(I2S_BUS_0, 12, true); // Example TX bus
-    init_i2s_bus(I2S_BUS_1, 11, false); // Example RX bus
+    i2s_init(I2S_BUS_0, 12, true); // Example TX bus
+    i2s_init(I2S_BUS_1, 11, false); // Example RX bus
 
     // Scan I2S bus (optional)
-    scan_i2s_bus();
+    i2s_scan_bus();
 
     // Initialize Golioth client
     Golioth golioth_client;
@@ -104,22 +104,22 @@ void app_main() {
 
     while (true) {
         // Ensure only one device is active on each bus
-        activate_i2s_device(I2S_BUS_1, true);
-        activate_i2s_device(I2S_BUS_0, false);
+        i2s_activate_device(I2S_BUS_1, true);
+        i2s_activate_device(I2S_BUS_0, false);
 
         // Read data from I2S device (example RX)
-        read_i2s_data(I2S_BUS_1, i2s_read_buff, sizeof(i2s_read_buff), &bytes_read);
+        i2s_read_data(I2S_BUS_1, i2s_read_buff, sizeof(i2s_read_buff), &bytes_read);
 
         // Process data as needed (e.g., send to cloud, apply DSP, etc.)
         // Here, we simply copy read buffer to write buffer
         memcpy(i2s_write_buff, i2s_read_buff, bytes_read);
 
         // Switch active device
-        activate_i2s_device(I2S_BUS_1, false);
-        activate_i2s_device(I2S_BUS_0, true);
+        i2s_activate_device(I2S_BUS_1, false);
+        i2s_activate_device(I2S_BUS_0, true);
 
         // Write data to I2S device (example TX)
-        write_i2s_data(I2S_BUS_0, i2s_write_buff, bytes_read, &bytes_written);
+        i2s_write_data(I2S_BUS_0, i2s_write_buff, bytes_read, &bytes_written);
 
         // Handle Golioth client instructions
         handle_golioth_client(golioth_client);

@@ -15,15 +15,16 @@
 #define I2C_MASTER_GLITCH_FILTER 7     // Sets the glitch filter for the I2C bus, everything shorter than 7 cycles is considered a glitch and is filtered out
 #define MAX_DEVICES 6                  // Sets the maximum number of I2C devices that can be connected to Nexus board
 
+
 static uint8_t devices[MAX_DEVICES]; // Creates an array to store the addresses of the devices found on the I2C bus
 static int device_count = 0;         // Initializes a variable to store the number of devices found
 
 // Function prototypes
-void i2c_master_RW_init(uint8_t device_address, uint8_t* data, size_t data_len);
-void i2c_master_RW(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len);
-void i2c_master_scan_devices();
-bool establish_connection(uint8_t device_address);
-void manage_i2c_devices();
+void i2c_init(uint8_t device_address, uint8_t* data, size_t data_len);
+void i2c_RW_data(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len);
+void i2c_scan_bus();
+bool i2c_establish_connection(uint8_t device_address);
+void i2c_manage_devices();
 void golioth_perform_action(const char* instruction);
 void log_to_golioth_and_sd(const char* log_message);
 
@@ -34,7 +35,7 @@ void IRAM_ATTR golioth_instruction_received() {
 }
 
 // Initialize the I2C master
-void i2c_master_RW_init() {
+void i2c_init() {
     i2c_config_t bus_config = {
         .mode = I2C_MODE_MASTER,
         .sda_io_num = I2C_MASTER_SDA_IO,       // Sets the GPIO number for the serial data bus (SDA)
@@ -49,7 +50,7 @@ void i2c_master_RW_init() {
 }
 
 // Read and Write data on the I2C bus
-void i2c_master_RW(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len) {
+void i2c_RW_data(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (device_address << 1) | I2C_MASTER_WRITE, true);
@@ -85,7 +86,7 @@ void i2c_master_RW(uint8_t device_address, uint8_t* data, size_t data_len, uint8
 }
 
 // Scan the I2C bus for devices
-void i2c_master_scan_devices() {
+void i2c_scan_bus() {
     device_count = 0; // Reset device count
 
     for (int i = 0; i < 128 && device_count < MAX_DEVICES; i++) {
@@ -106,9 +107,9 @@ void i2c_master_scan_devices() {
 }
 
 // Establish connection with a device
-bool establish_connection(uint8_t device_address) {
+bool i2c_establish_connection(uint8_t device_address) {
     for (int attempts = 0; attempts < 2; attempts++) {
-        i2c_master_scan_devices();
+        i2c_scan_bus();
         for (int i = 0; i < device_count; i++) {
             if (devices[i] == device_address) {
                 char log_message[64];
@@ -126,7 +127,7 @@ bool establish_connection(uint8_t device_address) {
 }
 
 // Manage I2C devices
-void manage_i2c_devices() {
+void i2c_manage_devices() {
     while (1) {
         if (device_count == 0) {
             log_to_golioth_and_sd("No I2C modules found on the Nexus board");
@@ -137,13 +138,13 @@ void manage_i2c_devices() {
                     snprintf(log_message, sizeof(log_message), "Establishing connection with device at address 0x%02x", devices[i]);
                     log_to_golioth_and_sd(log_message);
 
-                    if (establish_connection(devices[i])) {
+                    if (i2c_establish_connection(devices[i])) {
                         snprintf(log_message, sizeof(log_message), "Connection established with device at address 0x%02x", devices[i]);
                         log_to_golioth_and_sd(log_message);
                         // Perform read/write operations
                         uint8_t data[2] = {0x01, 0x02}; // Example data
                         uint8_t read_buf[2];
-                        i2c_master_RW(devices[i], data, sizeof(data), read_buf, sizeof(read_buf));
+                        i2c_RW_data(devices[i], data, sizeof(data), read_buf, sizeof(read_buf));
                     } else {
                         snprintf(log_message, sizeof(log_message), "Failed to establish connection with device at address 0x%02x", devices[i]);
                         log_to_golioth_and_sd(log_message);
@@ -153,7 +154,7 @@ void manage_i2c_devices() {
                 }
             }
         }
-        i2c_master_scan_devices();
+        i2c_scan_bus();
         vTaskDelay(1000 / portTICK_RATE_MS); // Delay to avoid busy looping
     }
 }
@@ -168,8 +169,8 @@ void golioth_perform_action(const char* instruction) {
     uint8_t device_address = 0x40; // Example address
     uint8_t data[2] = {0x01, 0x02}; // Example data
 
-    if (establish_connection(device_address)) {
-        i2c_master_RW_init(device_address, data, sizeof(data));
+    if (i2c_establish_connection(device_address)) {
+        i2c_init(device_address, data, sizeof(data));
     } else {
         snprintf(log_message, sizeof(log_message), "Failed to perform action on device at address 0x%02x", device_address);
         log_to_golioth_and_sd(log_message);
@@ -187,8 +188,8 @@ void log_to_golioth_and_sd(const char* log_message) {
 
 // Main I2C function
 void i2c_main() {
-    i2c_master_RW_init();
-    manage_i2c_devices();
+    i2c_init();
+    i2c_manage_devices();
 }
 
 #endif // I2C_MANAGER_H
