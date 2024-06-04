@@ -20,8 +20,9 @@ static uint8_t devices[MAX_DEVICES]; // Creates an array to store the addresses 
 static int device_count = 0;         // Initializes a variable to store the number of devices found
 
 // Function prototypes
-void i2c_init(uint8_t device_address, uint8_t* data, size_t data_len);
-void i2c_RW_data(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len);
+void i2c_init();
+void i2c_write_data(uint8_t device_address, uint8_t* data, size_t data_len);
+void i2c_read_data(uint8_t device_address, uint8_t* read_buf, size_t read_len);
 void i2c_scan_bus();
 bool i2c_establish_connection(uint8_t device_address);
 void i2c_manage_devices();
@@ -49,8 +50,8 @@ void i2c_init() {
     i2c_driver_install(I2C_MASTER_BUS_SELECT, bus_config.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
 
-// Read and Write data on the I2C bus
-void i2c_RW_data(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t* read_buf, size_t read_len) {
+// Write data to the I2C bus
+void i2c_write_data(uint8_t device_address, uint8_t* data, size_t data_len) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (device_address << 1) | I2C_MASTER_WRITE, true);
@@ -66,23 +67,19 @@ void i2c_RW_data(uint8_t device_address, uint8_t* data, size_t data_len, uint8_t
         snprintf(log_message, sizeof(log_message), "Data transmission to device 0x%02x failed", device_address);
     }
     log_to_golioth_and_sd(log_message);
+}
 
-    if (ret == ESP_OK && read_buf != NULL && read_len > 0) {
-        cmd = i2c_cmd_link_create();
-        i2c_master_start(cmd);
-        i2c_master_write_byte(cmd, (device_address << 1) | I2C_MASTER_READ, true);
-        i2c_master_read(cmd, read_buf, read_len, I2C_MASTER_LAST_NACK);
-        i2c_master_stop(cmd);
-        ret = i2c_master_cmd_begin(I2C_MASTER_BUS_SELECT, cmd, 1000 / portTICK_RATE_MS);
-        i2c_cmd_link_delete(cmd);
+// Read data from the I2C bus
+void i2c_read_data(uint8_t device_address, uint8_t* read_buf, size_t read_len) {
+    esp_err_t ret = i2c_master_read_from_device(I2C_MASTER_BUS_SELECT, device_address, read_buf, read_len, 1000 / portTICK_RATE_MS);
 
-        if (ret == ESP_OK) {
-            snprintf(log_message, sizeof(log_message), "Data received from device 0x%02x: %x %x", device_address, read_buf[0], read_buf[1]);
-        } else {
-            snprintf(log_message, sizeof(log_message), "Data reception from device 0x%02x failed", device_address);
-        }
-        log_to_golioth_and_sd(log_message);
+    char log_message[128];
+    if (ret == ESP_OK) {
+        snprintf(log_message, sizeof(log_message), "Data received from device 0x%02x: %x %x", device_address, read_buf[0], read_buf[1]);
+    } else {
+        snprintf(log_message, sizeof(log_message), "Data reception from device 0x%02x failed", device_address);
     }
+    log_to_golioth_and_sd(log_message);
 }
 
 // Scan the I2C bus for devices
@@ -144,7 +141,8 @@ void i2c_manage_devices() {
                         // Perform read/write operations
                         uint8_t data[2] = {0x01, 0x02}; // Example data
                         uint8_t read_buf[2];
-                        i2c_RW_data(devices[i], data, sizeof(data), read_buf, sizeof(read_buf));
+                        i2c_write_data(devices[i], data, sizeof(data));
+                        i2c_read_data(devices[i], read_buf, sizeof(read_buf));
                     } else {
                         snprintf(log_message, sizeof(log_message), "Failed to establish connection with device at address 0x%02x", devices[i]);
                         log_to_golioth_and_sd(log_message);
@@ -170,7 +168,7 @@ void golioth_perform_action(const char* instruction) {
     uint8_t data[2] = {0x01, 0x02}; // Example data
 
     if (i2c_establish_connection(device_address)) {
-        i2c_init(device_address, data, sizeof(data));
+        i2c_write_data(device_address, data, sizeof(data));
     } else {
         snprintf(log_message, sizeof(log_message), "Failed to perform action on device at address 0x%02x", device_address);
         log_to_golioth_and_sd(log_message);
