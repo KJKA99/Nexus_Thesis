@@ -25,7 +25,7 @@ I2SManager::~I2SManager() {
     i2s_driver_uninstall(i2s_port0);
     i2s_driver_uninstall(i2s_port1);
 }
-
+// 
 bool I2SManager::i2s_establish_connection(i2s_port_t i2s_num, i2s_config_t *i2s_config, i2s_pin_config_t *pin_config) {
     for (int i = 0; i < MAX_I2S_DEVICES; i++) {
         if (connected_devices[i] == -1) {

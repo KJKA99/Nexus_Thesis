@@ -103,7 +103,7 @@ bool SPIManager::spi_verify_connection(spi_device_handle_t handle) {
     return false;
 }
 
-void SPIManager::scan_and_update_devices() {
+void SPIManager::scan_and_update_devices() { // Scan and update the connected devices
     int valid_device_count = 0;
     for (int i = 0; i < device_count; ++i) {
         if (spi_verify_connection(devices[i])) {

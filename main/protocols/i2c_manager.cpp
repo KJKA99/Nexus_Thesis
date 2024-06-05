@@ -96,26 +96,26 @@ void I2c_scan_bus() {
     }
 }
 
-bool I2C_establish_connection(uint8_t address) {
-    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) == i2c_addresses.end()) {
+bool I2C_establish_connection(uint8_t address) { // Establishes a connection with a device at a given address
+    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) == i2c_addresses.end()) { // If the address is not in the list of devices
         I2c_scan_bus();
     }
-    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) != i2c_addresses.end()) {
+    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) != i2c_addresses.end()) { // If the address is in the list of devices
         return i2c_master_verify_connection(address);
     }
     return false;
 }
-
+// Function to manage the devices connected to the I2C bus
 void I2C_manage_devices() {
-    for (auto it = i2c_addresses.begin(); it != i2c_addresses.end(); ) {
-        if (!i2c_master_verify_connection(*it)) {
-            it = i2c_addresses.erase(it);
+    for (auto it = i2c_addresses.begin(); it != i2c_addresses.end(); ) { // Iterates through the list of devices
+        if (!i2c_master_verify_connection(*it)) { // If the device is not connected
+            it = i2c_addresses.erase(it); // Removes the device from the list
         } else {
-            ++it;
+            ++it; // Moves to the next device
         }
     }
-    if (i2c_addresses.size() < MAX_DEVICES) {
-        I2c_scan_bus();
+    if (i2c_addresses.size() < MAX_DEVICES) { // If the number of devices is less than the maximum
+        I2c_scan_bus(); 
     }
 }
 
