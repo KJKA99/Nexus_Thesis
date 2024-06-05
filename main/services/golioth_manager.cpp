@@ -114,8 +114,8 @@ static golioth_rpc_status_t on_multiply(
     zcbor_state_t *response_detail_map,
     void *callback_arg) 
 
-// Send commands from client through RPC
-static golioth_rpc_status_t client_commands_to_device(
+/* Send commands from client through RPC
+static golioth_rpc_status_t client_commands_to_device (
     zcbor_state_t *request_params_array,
     zcbor_state_t *response_detail_map,
     void *callback_arg)
@@ -171,5 +171,102 @@ static golioth_rpc_status_t client_commands_to_device(
     }
 
     return GOLIOTH_RPC_OK;
+}*/
+
+// Send commands from client through RPC
+static golioth_rpc_status_t client_commands_to_device(
+    zcbor_state_t *request_params_array,
+    zcbor_state_t *response_detail_map,
+    void *callback_arg)
+{
+    // Parse the request parameters
+    char i2c_address[128] = {0};
+    char spi_cs[10] = {0};
+    char i2s_port[10] = {0};
+    char command[32] = {0};
+    char protocol[3] = {0};
+    char interval_str[10] = {0};
+    char duration_str[10] = {0};
+    char storage[10] = {0};
+
+    int interval = 0; // 0 means send continuously
+    int duration = 0; // 0 means send indefinitely
+    bool store_in_lightDB = false;
+
+    // Decode parameters from request
+    if (!zcbor_string_decode(request_params_array, target_address, sizeof(target_address)) ||
+        !zcbor_string_decode(request_params_array, command, sizeof(command)) ||
+        !zcbor_string_decode(request_params_array, protocol, sizeof(protocol))) {
+        return GOLIOTH_RPC_FAILED;
+    }
+
+    // Decode optional parameters if they are present
+    zcbor_string_decode(request_params_array, interval_str, sizeof(interval_str));
+    zcbor_string_decode(request_params_array, duration_str, sizeof(duration_str));
+    zcbor_string_decode(request_params_array, storage, sizeof(storage)); // lightDB or other storage
+
+    if (interval_str[0] != '\0') { // Check if interval is provided
+        interval = atoi(interval_str);
+    }
+    if (duration_str[0] != '\0') { // Check if duration is provided
+        duration = atoi(duration_str);
+    }
+    if (strcmp(storage, "lightDB") == 0) { // Check if data should be stored in lightDB
+        store_in_lightDB = true;
+    }
+
+    // Perform the requested action based on the command
+    if (strcmp(command, "send_data") == 0) {
+        // Data buffer
+        uint8_t data[256];
+        size_t data_len = sizeof(data);
+        bool success = false;
+
+        // Establish connection and receive data based on the protocol
+        if (strcmp(protocol, "i2c") == 0) {
+            success = i2c_manager.establish_connection(i2c_address) && // Establish connection with the target address using I2C
+                      i2c_manager.i2c_master_receive(i2c_address, data, &data_len); // Receive data from the target address using I2C
+        } else if (strcmp(protocol, "spi") == 0) {
+            success = spi_manager.establish_connection(spi_cs) &&
+                      spi_manager.spi_read_device(spi_cs, data, &data_len);
+        } else if (strcmp(protocol, "i2s") == 0) {
+            success = i2s_manager.establish_connection(i2s_port) &&
+                      i2s_manager.i2s_read_device(i2s_port, data, &data_len);
+        } else {
+            log_to_golioth("Invalid protocol specified");
+            return GOLIOTH_RPC_FAILED;
+        }
+
+        if (success) {
+            // Send the data to the Golioth server
+            golioth_stream_set_async(_client, "data", GOLIOTH_CONTENT_TYPE_JSON, data, data_len, NULL, NULL);
+            zcbor_tstr_encode_ptr(response_detail_map, "data", data, data_len);
+            golioth_log("info", "Data sent successfully");
+
+            if (store_in_lightDB) {
+                send_data_periodically("path/to/store/data", (const char*)data); // Store data in LightDB // Todo: add actual lightDB path
+            }
+
+             // Periodic data sending logic (if interval > 0)
+            if (interval > 0) {
+                stop_sending = false;
+                send_timer = xTimerCreate("SendTimer", pdMS_TO_TICKS(interval * 1000), pdTRUE, NULL, send_data_callback);
+                xTimerStart(send_timer, 0);
+            }
+
+            // Duration logic (if duration > 0)
+            if (duration > 0) {
+                duration_timer = xTimerCreate("DurationTimer", pdMS_TO_TICKS(duration * 1000), pdFALSE, NULL, duration_callback);
+                xTimerStart(duration_timer, 0);
+            }
+
+            return GOLIOTH_RPC_OK;
+        } else {
+            log_to_golioth("Failed to establish connection or receive data");
+            return GOLIOTH_RPC_FAILED;
+        }
+    }
+
+    return GOLIOTH_RPC_FAILED;
 }
    

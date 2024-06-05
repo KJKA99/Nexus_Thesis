@@ -4,6 +4,10 @@
 #include "driver/i2c.h"
 #include "client.h" // Include the specific Golioth header
 #include "log.h"    // Include Golioth logging header
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <stdio.h>
+#include "golioth_manager.h"
 // #include "sd_card.h"        // Include SD card header
 
 #define I2C_MASTER_SDA_IO 21           // Sets the GPIO number for the serial data bus (SDA)
@@ -82,112 +86,62 @@ void i2c_read_data(uint8_t device_address, uint8_t* read_buf, size_t read_len) {
     log_to_golioth_and_sd(log_message);
 }
 
-// Scan the I2C bus for devices
-void i2c_scan_bus() {
-    device_count = 0; // Reset device count
-
-    for (int i = 0; i < 128 && device_count < MAX_DEVICES; i++) {
-        i2c_cmd_handle_t cmd = i2c_cmd_link_create(); // Creates an I2C command link
-        i2c_master_start(cmd);                        // Sends a start condition on the I2C bus
-        i2c_master_write_byte(cmd, (i << 1) | I2C_MASTER_WRITE, true); // Writes the address of the device to the I2C bus
-        i2c_master_stop(cmd);                         // Sends a stop condition on the I2C bus
-        esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_BUS_SELECT, cmd, 1000 / portTICK_RATE_MS); // Sends the I2C command
-        i2c_cmd_link_delete(cmd);                     // Deletes the I2C command link
-
-        if (ret == ESP_OK) {
-            devices[device_count++] = i;              // Stores the address of the device in the array
-            char log_message[64];
-            snprintf(log_message, sizeof(log_message), "Found device at address 0x%02x", i); // Prints the address of the device
-            log_to_golioth_and_sd(log_message);
+void I2c_scan_bus() {
+    for (int i = 1; i < 127; i++) {
+        if (i2c_master_probe(i)) {
+            if (i2c_addresses.size() < MAX_DEVICES) {
+                i2c_addresses.push_back(i);
+            }
         }
     }
 }
 
-// Establish connection with a device
-bool i2c_establish_connection(uint8_t device_address) {
-    for (int attempts = 0; attempts < 2; attempts++) {
-        i2c_scan_bus();
-        for (int i = 0; i < device_count; i++) {
-            if (devices[i] == device_address) {
-                char log_message[64];
-                snprintf(log_message, sizeof(log_message), "Connection established with device at address 0x%02x", device_address);
-                log_to_golioth_and_sd(log_message);
-                return true;
-            }
-        }
+bool I2C_establish_connection(uint8_t address) {
+    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) == i2c_addresses.end()) {
+        I2c_scan_bus();
     }
-
-    char log_message[64];
-    snprintf(log_message, sizeof(log_message), "Failed to establish connection with device at address 0x%02x", device_address);
-    log_to_golioth_and_sd(log_message);
+    if (std::find(i2c_addresses.begin(), i2c_addresses.end(), address) != i2c_addresses.end()) {
+        return i2c_master_verify_connection(address);
+    }
     return false;
 }
 
-// Manage I2C devices
-void i2c_manage_devices() {
-    while (1) {
-        if (device_count == 0) {
-            log_to_golioth_and_sd("No I2C modules found on the Nexus board");
+void I2C_manage_devices() {
+    for (auto it = i2c_addresses.begin(); it != i2c_addresses.end(); ) {
+        if (!i2c_master_verify_connection(*it)) {
+            it = i2c_addresses.erase(it);
         } else {
-            for (int i = 0; i < device_count; i++) {
-                if (devices[i] != 0) {
-                    char log_message[64];
-                    snprintf(log_message, sizeof(log_message), "Establishing connection with device at address 0x%02x", devices[i]);
-                    log_to_golioth_and_sd(log_message);
-
-                    if (i2c_establish_connection(devices[i])) {
-                        snprintf(log_message, sizeof(log_message), "Connection established with device at address 0x%02x", devices[i]);
-                        log_to_golioth_and_sd(log_message);
-                        // Perform read/write operations
-                        uint8_t data[2] = {0x01, 0x02}; // Example data
-                        uint8_t read_buf[2];
-                        i2c_write_data(devices[i], data, sizeof(data));
-                        i2c_read_data(devices[i], read_buf, sizeof(read_buf));
-                    } else {
-                        snprintf(log_message, sizeof(log_message), "Failed to establish connection with device at address 0x%02x", devices[i]);
-                        log_to_golioth_and_sd(log_message);
-                        devices[i] = 0; // Remove the address of the device from the array
-                        device_count--;
-                    }
-                }
-            }
+            ++it;
         }
-        i2c_scan_bus();
-        vTaskDelay(1000 / portTICK_RATE_MS); // Delay to avoid busy looping
+    }
+    if (i2c_addresses.size() < MAX_DEVICES) {
+        I2c_scan_bus();
     }
 }
 
-// Perform action based on instruction from Golioth
-void golioth_perform_action(const char* instruction) {
-    char log_message[128];
-    snprintf(log_message, sizeof(log_message), "Received instruction: %s", instruction);
-    log_to_golioth_and_sd(log_message);
-
-    // Example: parse instruction to get device address and data
-    uint8_t device_address = 0x40; // Example address
-    uint8_t data[2] = {0x01, 0x02}; // Example data
-
-    if (i2c_establish_connection(device_address)) {
-        i2c_write_data(device_address, data, sizeof(data));
-    } else {
-        snprintf(log_message, sizeof(log_message), "Failed to perform action on device at address 0x%02x", device_address);
-        log_to_golioth_and_sd(log_message);
-    }
+// Function to probe the I2C bus and check if a device is present
+bool i2c_master_probe(uint8_t address) {
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_WRITE, true);
+    i2c_master_stop(cmd);
+    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_PERIOD_MS);
+    i2c_cmd_link_delete(cmd);
+    return ret == ESP_OK;
 }
 
-// Log messages to Golioth and SD card
-void log_to_golioth_and_sd(const char* log_message) {
-    printf("%s\n", log_message); // Print to console
-    // Log to Golioth client
-    golioth_log(log_message);
-    // Log to SD card (commented out)
-    // sd_card_log(log_message);
+// Function to verify if a device is connected at a given address
+bool i2c_master_verify_connection(uint8_t address) {
+    return i2c_master_probe(address);
 }
+
+
+
 
 // Main I2C function
 void i2c_main() {
     i2c_init();
-    i2c_manage_devices();
+    i2c_scan_bus();
 }
 
 #endif // I2C_MANAGER_H
