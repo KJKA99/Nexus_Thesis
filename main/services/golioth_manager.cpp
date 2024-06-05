@@ -171,8 +171,8 @@ static golioth_rpc_status_t client_commands_to_device(
             success = spi_manager.spi_establish_connection(SPI2_HOST, cs_pin, &handle) &&
                       spi_manager.spi_master_receive(spi_cs, data, &data_len);
         } else if (strcmp(protocol, "i2s") == 0) {
-            success = i2s_manager.establish_connection(i2s_port) &&
-                      i2s_manager.i2s_read_device(i2s_port, data, &data_len);
+            success = i2s_manager.i2s_establish_connection(i2s_port) &&
+                      i2s_manager.i2s_master_receive(i2s_port, data, &data_len);
         } else {
             log_to_golioth("Invalid protocol specified");
             return GOLIOTH_RPC_FAILED;
