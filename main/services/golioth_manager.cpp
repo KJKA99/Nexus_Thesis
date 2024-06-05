@@ -114,65 +114,6 @@ static golioth_rpc_status_t on_multiply(
     zcbor_state_t *response_detail_map,
     void *callback_arg) 
 
-/* Send commands from client through RPC
-static golioth_rpc_status_t client_commands_to_device (
-    zcbor_state_t *request_params_array,
-    zcbor_state_t *response_detail_map,
-    void *callback_arg)
-{
-    // Parse the request parameters
-    char i2c_target_address[128];
-    char spi_target_cs[6]
-    char command[32];
-    char protocol[3];
-    char intervall[60]
-    zcbor_string_decode(request_params_array, target_address, sizeof(target_address));
-    zcbor_string_decode(request_params_array, command, sizeof(command));
-    zcbor_string_decode(request_params_array, protocol, sizeof(protocol));
-
-    // Perform the requested action based on the command
-    if (strcmp(command, "send_data_continuously") == 0) {
-        // Establish contact with the target address using the appropriate protocol (I2C, I2S, or SPI)
-        // If the connection is successful, send the command to the device to send data continuously
-        // Receive the data from the device
-        // Encode the received data into the response detail map
-
-        switch (protocol) {
-            case "i2c":
-                if (i2c_manager.establish_connection(i2c_target_address) == true) { // Established connection with the target address using I2C
-                    i2c_manager.i2c_master_receive(target_address, data, data_len); // Receive data from the target address using I2C
-                    golioth_stream_set_async(_client, "data", GOLIOTH_CONTENT_TYPE_JSON, data, data_len, NULL, NULL); // Send the data to the Golioth server
-                    response_detail_map = zcbor_map_create(); // Encode the received data into the response detail map
-                    golioth_log("info", "Data sent successfully");
-                }
-                break;
-            case "spi":
-                if (spi_manager.establish_connection(spi_target_cs) == true) {
-                    spi_manager.spi_read_device(spi_target_cs, data, data_len);
-                    golioth_stream_set_async(_client, "data", GOLIOTH_CONTENT_TYPE_JSON, data, data_len, NULL, NULL);
-                    response_detail_map = zcbor_map_create();
-                    golioth_log("info", "Data sent successfully");
-
-                }
-                break;
-            case "i2s":
-                if (i2s_manager.establish_connection(target_address) == true) {
-                    i2s_manager.i2s_read_device(target_address, data, data_len);
-                }
-                break;
-            default:
-                log_to_golioth("Invalid protocol specified");
-                break;
-        }
-        
-        zcbor_tstr_encode_ptr(response_detail_map, "data", data, data_len);
-    } else if (strcmp(command, "send_data_periodically") == 0) {
-        // Similar steps as above, but for sending data periodically
-    }
-
-    return GOLIOTH_RPC_OK;
-}*/
-
 // Send commands from client through RPC
 static golioth_rpc_status_t client_commands_to_device(
     zcbor_state_t *request_params_array,
@@ -224,11 +165,11 @@ static golioth_rpc_status_t client_commands_to_device(
 
         // Establish connection and receive data based on the protocol
         if (strcmp(protocol, "i2c") == 0) {
-            success = i2c_manager.establish_connection(i2c_address) && // Establish connection with the target address using I2C
+            success = i2c_manager.i2c_establish_connection(i2c_address) && // Establish connection with the target address using I2C
                       i2c_manager.i2c_master_receive(i2c_address, data, &data_len); // Receive data from the target address using I2C
         } else if (strcmp(protocol, "spi") == 0) {
-            success = spi_manager.establish_connection(spi_cs) &&
-                      spi_manager.spi_read_device(spi_cs, data, &data_len);
+            success = spi_manager.spi_establish_connection(SPI2_HOST, cs_pin, &handle) &&
+                      spi_manager.spi_master_receive(spi_cs, data, &data_len);
         } else if (strcmp(protocol, "i2s") == 0) {
             success = i2s_manager.establish_connection(i2s_port) &&
                       i2s_manager.i2s_read_device(i2s_port, data, &data_len);
