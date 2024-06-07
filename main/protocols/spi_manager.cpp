@@ -46,7 +46,7 @@ bool SPIManager::spi_establish_connection(spi_host_device_t host, int cs_pin, sp
         }
     }
 
-    // If the devices array is full, verify and update connections
+    // If the devices array is full, scan and update connections
     if (device_count >= MAX_DEVICES) {
         scan_and_update_devices();
         if (device_count >= MAX_DEVICES) {
@@ -88,25 +88,12 @@ bool SPIManager::spi_master_receive(spi_device_handle_t handle, uint8_t* data, s
     return spi_device_transmit(handle, &t) == ESP_OK;
 }
 
-void SPIManager::spi_add_device(spi_device_handle_t handle) {
-    if (device_count < MAX_DEVICES) {
-        devices[device_count++] = handle;
-    }
-}
-
-bool SPIManager::spi_verify_connection(spi_device_handle_t handle) {
-    for (int i = 0; i < device_count; ++i) {
-        if (devices[i] == handle) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void SPIManager::scan_and_update_devices() { // Scan and update the connected devices
+void SPIManager::scan_and_update_devices() {
     int valid_device_count = 0;
     for (int i = 0; i < device_count; ++i) {
-        if (spi_verify_connection(devices[i])) {
+        spi_device_interface_config_t devcfg = {};
+        spi_get_device_info(devices[i], &devcfg);
+        if (spi_device_transmit(devices[i], nullptr) == ESP_OK) {
             devices[valid_device_count++] = devices[i];
         }
     }
