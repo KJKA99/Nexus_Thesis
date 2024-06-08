@@ -40,7 +40,7 @@ void module_connector(const char* protocol, const char* target_address, const ch
             }
         }
     }
-}
+
     
     if (strcmp(protocol, "I2S") == 0) {
         if (strcmp(target_address, "0xA0") == 0) {
@@ -50,12 +50,15 @@ void module_connector(const char* protocol, const char* target_address, const ch
         // Add other I2C modules here
     }
 
-    if (strcmp(protocol, "SPI") == 0) {
-        if (strcmp(target_address, "0xA0") == 0) {
-            spi_manager.spi_establish_connection(target_address) &&
-            humidity_module(action, duration, interval, store_in_lightDB);
-        }
-        // Add other I2C modules here
-    }
     // Add other protocols (SPI, I2S) and their corresponding modules here
+
+
+    if (strcmp(protocol, "SPI") == 0) {
+        for (int i = 0; i < MAX_DEVICES; i++) {
+            if (strcmp(common_spi_register[i].module_identifier, "pressure_module") == 0) {
+                pressure_module(action, duration, interval, store_in_lightDB);
+            }
+            // Add other SPI modules here
+        }
+    }
 }
