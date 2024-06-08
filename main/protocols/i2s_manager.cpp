@@ -117,3 +117,49 @@ void I2SManager::switch_to_next_device() {
         switch_sd_pin(next_device);
     }
 }
+
+bool i2s_is_microphone_data(uint8_t* data, size_t length) {
+    int silence_threshold = 10;
+    int silent_samples = 0;
+    int total_samples = length / 2;
+
+    for (size_t i = 0; i < length; i += 2) {
+        int16_t sample = (data[i+1] << 8) | data[i];
+        if (abs(sample) < silence_threshold) {
+            silent_samples++;
+        }
+    }
+
+    return (silent_samples > (total_samples / 2));
+}
+
+bool i2s_is_amplifier_data(uint8_t* data, size_t length) {
+    int silence_threshold = 10;
+    int non_silent_samples = 0;
+    int total_samples = length / 2;
+
+    for (size_t i = 0; i < length; i += 2) {
+        int16_t sample = (data[i+1] << 8) | data[i];
+        if (abs(sample) >= silence_threshold) {
+            non_silent_samples++;
+        }
+    }
+
+    return (non_silent_samples > (total_samples / 2));
+}
+
+int i2s_identify_device_characteristics(int port) {
+    size_t buffer_length = 128;
+    uint8_t data[buffer_length];
+    size_t bytes_read;
+    i2s_read((i2s_port_t)port, data, buffer_length, &bytes_read, portMAX_DELAY);
+
+    if (is_microphone_data(data, buffer_length)) {
+        return DEVICE_TYPE_MICROPHONE;
+    } else if (is_amplifier_data(data, buffer_length)) {
+        return DEVICE_TYPE_AMPLIFIER;
+    } else {
+        return DEVICE_TYPE_UNKNOWN;
+    }
+}
+

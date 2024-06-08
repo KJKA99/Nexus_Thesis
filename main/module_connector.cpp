@@ -1,6 +1,10 @@
 #include "protocols/spi_manager.h"
 #include "protocols/i2c_manager.h"
 #include "protocols/i2s_manager.h"
+#include "modules/humidity_module.cpp"
+#include "modules/accelerometer_and_gyroscope_module"
+
+
 
 void module_connector(const char* protocol, const char* target_address, const char* action, int duration, int interval, bool store_in_lightDB) {
     if (strcmp(protocol, "I2C") == 0) {
@@ -43,11 +47,19 @@ void module_connector(const char* protocol, const char* target_address, const ch
 
     
     if (strcmp(protocol, "I2S") == 0) {
-        if (strcmp(target_address, "0xA0") == 0) {
-            i2s_manager.i2s_establish_connection(target_address) &&
-            humidity_module(action, duration, interval, store_in_lightDB);
+        int possible_sd_pins[] = { GPIO_NUM_22, GPIO_NUM_21, GPIO_NUM_19, GPIO_NUM_18 };
+        int num_pins = sizeof(possible_sd_pins) / sizeof(possible_sd_pins[0]);
+
+        for (int i = 0; i < num_pins; i++) {
+            int port = 0; // Use I2S_NUM_0 or I2S_NUM_1 based on your design
+            i2s_establish_connection(port, possible_sd_pins[i]);
+
+            int device_type = i2s_manager.i2s_identify_device_characteristics(port);
+            if (device_type != DEVICE_TYPE_UNKNOWN) {
+                printf("Detected device type %d on SD pin %d\n", device_type, possible_sd_pins[i]);
+                // Store or process the identified device as needed
+            }
         }
-        // Add other I2C modules here
     }
 
     // Add other protocols (SPI, I2S) and their corresponding modules here
