@@ -21,7 +21,8 @@ void setup() {
 
     // Initialize communication protocols
     Serial.println("Initializing I2C...");
-    Init_I2C();
+    i2c_manager.init_i2c();
+    i2c_manager.i2c_scan_bus();
 
     Serial.println("Initializing SPI...");
     Init_SPI();
@@ -49,18 +50,13 @@ void loop() {
     }
 
     // Manage devices (non-interrupt driven)
-    I2C_manager();
+    I2C_manager.i2c_manage_devices();
     SPI_manager();
     I2S_manager();
 
     delay(1000);  // Adjust delay as needed
 }
 
-void Init_I2C() {
-    i2c_master_init();
-    gpio_init();  // Initialize GPIOs for module detection
-    i2c_scan();   // Initial scan of the I2C bus
-}
 
 void Init_SPI() {
     setup_spi();  // Setup SPI devices

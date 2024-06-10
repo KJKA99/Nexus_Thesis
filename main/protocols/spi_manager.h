@@ -26,12 +26,18 @@ public:
     bool spi_master_transmit(spi_device_handle_t handle, const uint8_t* data, size_t length);
     bool spi_master_receive(spi_device_handle_t handle, uint8_t* data, size_t length);
 
+    void enableInterrupt(uint8_t pin, uint8_t mode); // Ensure the parameters match the definition
+    void disableInterrupt(uint8_t pin);
+    void handleInterrupt();
+
+    void initialize_common_spi_register();
+
 private:
     static xQueueHandle isr_queue;
     spi_device_handle_t devices[MAX_DEVICES];
     int device_count;
 
-    void initialize_common_spi_register();
+    
     void scan_and_update_devices();
     void spi_gpio_config();
     static void IRAM_ATTR gpio_isr_handler(void* arg);

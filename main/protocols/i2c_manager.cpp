@@ -10,8 +10,8 @@
 #include "golioth_manager.h"
 // #include "sd_card.h"        // Include SD card header
 
-#define I2C_MASTER_SDA_IO 21           // Sets the GPIO number for the serial data bus (SDA)
-#define I2C_MASTER_SCL_IO 22           // Sets the GPIO number for the serial clock bus (SCL)
+#define I2C_MASTER_SDA_IO 9           // Sets the GPIO number for the serial data bus (SDA)
+#define I2C_MASTER_SCL_IO 10           // Sets the GPIO number for the serial clock bus (SCL)
 #define I2C_MASTER_FREQ_HZ 100000      // Sets the I2C frequency
 #define I2C_MASTER_TX_BUF_DISABLE 0    // Disables the buffer for the transmission
 #define I2C_MASTER_RX_BUF_DISABLE 0    // Disables the buffer for the reception
@@ -22,6 +22,7 @@
 
 static uint8_t devices[MAX_DEVICES]; // Creates an array to store the addresses of the devices found on the I2C bus
 static int device_count = 0;         // Initializes a variable to store the number of devices found
+
 
 // Function prototypes
 void i2c_init();
@@ -50,7 +51,7 @@ void i2c_init() {
         .master.clk_speed = I2C_MASTER_FREQ_HZ // Sets the clock frequency for the I2C bus
     };
 
-    i2c_param_config(I2C_MASTER_BUS_SELECT, &bus_config);
+    i2c_param_config(I2C_MASTER_BUS_SELECT, &bus_config); //
     i2c_driver_install(I2C_MASTER_BUS_SELECT, bus_config.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
 }
 
